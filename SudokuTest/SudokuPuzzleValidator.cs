@@ -50,36 +50,52 @@ namespace SudokuTest
                 new int[] {1}
             };
 
-            Console.WriteLine($"Is good Sudoku valid? {ValidateSudoku(goodSudoku1)}");
-            Console.WriteLine($"Is good Sudoku valid? {ValidateSudoku(goodSudoku2)}");
+            Console.WriteLine($"Is good Sudoku valid? {ValidateSudoku(goodSudoku1).Result}");
+            Console.WriteLine($"Is good Sudoku valid? {ValidateSudoku(goodSudoku2).Result}");
 
-            Console.WriteLine($"Is bad Sudoku valid? {!ValidateSudoku(badSudoku1)}");
-            Console.WriteLine($"Is bad Sudoku valid? {!ValidateSudoku(badSudoku2)}");
+            Console.WriteLine($"Is bad Sudoku valid? {!ValidateSudoku(badSudoku1).Result}");
+            Console.WriteLine($"Is bad Sudoku valid? {!ValidateSudoku(badSudoku2).Result}");
         }
 
-        static bool ValidateSudoku(int[][] puzzle)
+        static async Task<bool> ValidateSudoku(int[][] sudoku)
         {
-            if (puzzle == null)
+            if (sudoku == null)
             {
                 throw new ArgumentNullException("Sudoku board can not be null.");
             }
-            var sudoku = puzzle.ToList();
-
+            
             int count = sudoku.Count();
 
-            bool isValid = false;
+            var isRowsValidTask = IsRowsValid(sudoku, count);
+            var isColsValidTask = IsColsValid(sudoku, count);
+            var isLittleSqrsValidTask = IsLittleSqrsValid(sudoku, count);
 
-            //Validate rows
-            isValid = sudoku.All(r => r.Distinct().Count() == count);
+            await Task.WhenAll(isRowsValidTask, isColsValidTask, isLittleSqrsValidTask);
 
-            //Validate cols
-            isValid = isValid && Enumerable.Range(0, count)
+            return isRowsValidTask.Result && isColsValidTask.Result && isLittleSqrsValidTask.Result;
+        }
+
+        private static async Task<bool> IsRowsValid(int[][] sudoku, int count)
+        {
+            return await Task.Run(() =>
+            {
+                return sudoku.All(r => r.Where(c=>c > 0).Distinct().Count() == count);
+            });
+        }
+
+        private static async Task<bool> IsColsValid(int[][] sudoku, int count)
+        {
+            return await Task.Run(() =>
+            {
+                return Enumerable.Range(0, count)
                 .All(c =>
-                    sudoku.Select(r => r.ElementAt(c)).Distinct().Count() == count);
+                    sudoku.Select(r => r.Where(c => c > 0).ElementAt(c)).Distinct().Count() == count);
+            });
+        }
 
-            //Validate little squares
-            //No need to check the little squares if rows or cols validation fails
-            if (isValid)
+        private static async Task<bool> IsLittleSqrsValid(int[][] sudoku, int count)
+        {
+            return await Task.Run(() =>
             {
                 int littSqrSize = (int)Math.Sqrt(count);
                 var littleSqrs = Enumerable.Range(0, littSqrSize)
@@ -93,10 +109,8 @@ namespace SudokuTest
                                                       .Take(littSqrSize))
                                     )
                         );
-                isValid = littleSqrs.All(lg => lg.Distinct().Count() == count);
-            }
-
-            return isValid;
+                return littleSqrs.All(lg => lg.Where(c => c > 0).Distinct().Count() == count);
+            });
         }
     }
 }
